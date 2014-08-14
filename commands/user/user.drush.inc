@@ -193,6 +193,7 @@ function user_drush_command() {
     'options' => array(
       'browser' => 'Optional value denotes which browser to use (defaults to operating system default). Set to 0 to suppress opening a browser.',
       'uid' => 'A uid to log in as.',
+      'redirect-port' => 'The port that the web server is redirected to (e.g. when running within a Vagrant environment)',
       'name' => 'A user name to log in as.',
       'mail' => 'A user mail address to log in as.',
     ),
@@ -420,7 +421,7 @@ function drush_user_login($user = NULL, $path = NULL) {
   // the *local* machine.
   $alias = drush_get_context('DRUSH_TARGET_SITE_ALIAS');
   if (drush_sitealias_is_remote_site($alias)) {
-    $return = drush_invoke_process($site_record, 'user-login', $args, drush_redispatch_get_options(), array('integrate' => FALSE));
+    $return = drush_invoke_process($alias, 'user-login', $args, drush_redispatch_get_options(), array('integrate' => FALSE));
     if ($return['error_status']) {
       return drush_set_error('Unable to execute user login.');
     }
@@ -457,7 +458,13 @@ function drush_user_login($user = NULL, $path = NULL) {
           if ($path) {
             $options['query']['destination'] = $path;
           }
-          $link = url(user_pass_reset_url($user_object), $options);
+          // Since Drupal 8 the one time URL does not contain 'login' anymore.
+          if (drush_drupal_major_version() <= 7) {
+            $link = url(user_pass_reset_url($user_object) . '/login', $options);
+          }
+          else {
+            $link = url(user_pass_reset_url($user_object), $options);
+          }
         }
         else {
           return drush_set_error("The user account $uid is blocked.");
@@ -471,8 +478,8 @@ function drush_user_login($user = NULL, $path = NULL) {
       return FALSE; // An error has already been logged.
     }
   }
-
-  drush_start_browser($link);
+  $port = drush_get_option('redirect-port', FALSE);
+  drush_start_browser($link, FALSE, $port);
   return $link;
 }
 
